@@ -1,13 +1,7 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import FastAPI
 
-from src.database import get_session
+from src.auth.routes import router as auth_router
 
-app = FastAPI()
+app = FastAPI(title="Okane API")
 
-
-@app.get("/")
-async def read_root(session: AsyncSession = Depends(get_session)):
-    await session.execute(text("SELECT 1"))
-    return {"message": "DB connected"}
+app.include_router(auth_router)
