@@ -3,3 +3,5 @@ SQLAlchemy
 asyncpg
 python-dotenv
 pydantic_settings
+alembic
+psycopg2-binary
