@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 
-from src.auth.models import User
+from src.auth.models import User, Session
 from src.auth.schemas import UserRegister, UserLogin
 from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token
 from src.database import get_session
@@ -37,3 +37,20 @@ async def auth_user(payload: UserLogin, response: Response, session: AsyncSessio
     refresh_token = await create_refresh_token(user_id=user.id, session=session)
     response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True)
     return {"access_token": access_token}
+
+@router.get("/logout")
+async def logout_user(request: Request, response: Response, session: AsyncSession = Depends(get_session)):
+    refresh_token = request.cookies.get("user_refresh_token")
+    
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
+
+    session = await session.execute(select(Session).where(Session.token == refresh_token))
+    session_data = session.scalar_one_or_none()
+
+    if session_data:
+        await session.delete(session_data)
+        await session.commit()
+
+    response.delete_cookie("user_refresh_token")
+    return {"message": "Logged out successfully"}
