@@ -1,9 +1,10 @@
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 
 from src.auth.models import User, Session
-from src.auth.schemas import UserRegister, UserLogin
+from src.auth.schemas import UserRegister, UserLogin, Token
 from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token
 from src.database import get_session
 
@@ -25,8 +26,8 @@ async def register_user(payload: UserRegister, session: AsyncSession = Depends(g
     
     return {"message": "User successfully registered"}
 
-@router.post("/login")
-async def auth_user(payload: UserLogin, response: Response, session: AsyncSession = Depends(get_session)):
+@router.post("/login", response_model=Token)
+async def auth_user(payload: UserLogin, response: Response, session: AsyncSession = Depends(get_session)) -> Token:
     result = await session.execute(select(User).where(User.username == payload.username))
     user = result.scalar_one_or_none()
 
@@ -36,7 +37,30 @@ async def auth_user(payload: UserLogin, response: Response, session: AsyncSessio
     access_token = create_access_token({"sub": user.username})
     refresh_token = await create_refresh_token(user_id=user.id, session=session)
     response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True)
-    return {"access_token": access_token}
+    return Token(access_token=access_token, token_type="bearer")
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(request: Request, response: Response, session: AsyncSession = Depends(get_session)) -> Token:
+    refresh_token = request.cookies.get("user_refresh_token")
+
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
+    
+    session_query = await session.execute(select(Session).where(Session.token == refresh_token))
+    session_data = session_query.scalar_one_or_none()
+
+    if not session_data or session_data.expires_in < datetime.now(timezone.utc).timestamp():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
+    
+    user_query = await session.execute(select(User).where(User.id == session_data.user_id))
+    user_data = user_query.scalar_one_or_none()
+
+    if not user_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    access_token = create_access_token({"sub": user_data.username})
+    
+    return Token(access_token=access_token, token_type="bearer")
 
 @router.get("/logout")
 async def logout_user(request: Request, response: Response, session: AsyncSession = Depends(get_session)):
@@ -45,8 +69,8 @@ async def logout_user(request: Request, response: Response, session: AsyncSessio
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
 
-    session = await session.execute(select(Session).where(Session.token == refresh_token))
-    session_data = session.scalar_one_or_none()
+    session_query = await session.execute(select(Session).where(Session.token == refresh_token))
+    session_data = session_query.scalar_one_or_none()
 
     if session_data:
         await session.delete(session_data)
