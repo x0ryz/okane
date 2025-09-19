@@ -6,3 +6,4 @@ pydantic_settings
 alembic
 psycopg2-binary
 passlib[bcrypt]
+pyjwt
