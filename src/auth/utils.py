@@ -32,3 +32,7 @@ async def create_refresh_token(user_id: int, session) -> uuid.UUID:
 
     await session.commit()
     return refresh_token
+
+def decode_token(token: str):
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.ALGORITHM)
+    return payload
