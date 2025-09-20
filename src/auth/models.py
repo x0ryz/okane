@@ -26,6 +26,11 @@ class User(Base):
         cascade="all, delete-orphan"
     )
 
+    transactions: Mapped[list[Transaction]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
 
 class Session(Base):
     __tablename__ = "sessions"
