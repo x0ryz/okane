@@ -1,16 +1,22 @@
 from datetime import datetime
 from pydantic import BaseModel
 
-class CreateTransaction(BaseModel):
+class TransactionCreate(BaseModel):
     type: str
     name: str
     amount: float
     date: datetime
 
-class TranactionsOut(BaseModel):
+
+class TransactionOut(BaseModel):
+    id: int
     type: str
     name: str
     amount: float
 
     class Config:
-        orm_mode: True
+        from_attributes = True
+
+
+class TransactionDetail(TransactionOut):
+    date: datetime
