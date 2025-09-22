@@ -23,6 +23,9 @@ async def create_transaction(payload: TransactionCreate, session: AsyncSession =
 async def get_transactions(session: AsyncSession = Depends(get_session), user = Depends(read_user)):
     query = await session.execute(select(Transaction).where(Transaction.user_id == user.id))
     result = query.scalars().all()
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Transactions not found")
 
     return result
 
@@ -35,3 +38,16 @@ async def get_transaction_by_id(transaction_id: int, session: AsyncSession = Dep
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     return result
+
+@router.delete("/{transaction_id}")
+async def delete_transaction_by_id(transaction_id: int, session: AsyncSession = Depends(get_session), user = Depends(read_user)):
+    query = await session.execute(select(Transaction).where(Transaction.id == transaction_id), Transaction.user_id == user.id)
+    result = query.scalar_one_or_none()
+
+    if result:
+        await session.delete(result)
+        await session.commit()
+    else:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    return {"message": "Transaction successfully deleted"}
