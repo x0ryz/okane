@@ -31,6 +31,11 @@ class User(Base):
         cascade="all, delete-orphan"
     )
 
+    categories: Mapped[list[Category]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
 
 class Session(Base):
     __tablename__ = "sessions"

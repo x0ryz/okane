@@ -23,7 +23,8 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from src.auth.models import User, Session
-from src.transactions.models import Transactions
+from src.transactions.models import Transaction
+from src.categories.models import Category
 from src.database import Base
 target_metadata = Base.metadata
 
