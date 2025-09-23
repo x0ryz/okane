@@ -14,4 +14,4 @@ class Category(Base):
 
     name: Mapped[str] = mapped_column(String, nullable=False)
 
-    user: Mapped[User] = relationship(back_populates="transactions")
+    user: Mapped[User] = relationship(back_populates="categories")
