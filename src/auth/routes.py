@@ -58,8 +58,12 @@ async def refresh_token(request: Request, response: Response, session: AsyncSess
     if not user_data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    access_token = create_access_token({"sub": user_data.username})
+    await session.delete(session_data)
     
+    access_token = create_access_token({"sub": user_data.id})
+    refresh_token = await create_refresh_token(user_id=user_data.id, session=session)
+    response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="strict")
+
     return Token(access_token=access_token, token_type="bearer")
 
 @router.get("/logout")
@@ -69,7 +73,7 @@ async def logout_user(request: Request, response: Response, session: AsyncSessio
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
 
-    session_query = await session.execute(select(Session).where(Session.token == refresh_token))
+    session_query = await session.execute(select(Session).where(Session.token == get_token_hash(refresh_token)))
     session_data = session_query.scalar_one_or_none()
 
     if session_data:
