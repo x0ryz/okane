@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 
 from src.auth.models import User, Session
 from src.auth.schemas import UserRegister, UserLogin, Token
-from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token
+from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token, get_token_hash
 from src.database import get_session
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
@@ -36,7 +36,7 @@ async def auth_user(payload: UserLogin, response: Response, session: AsyncSessio
 
     access_token = create_access_token({"sub": user.username})
     refresh_token = await create_refresh_token(user_id=user.id, session=session)
-    response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True)
+    response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="strict")
     return Token(access_token=access_token, token_type="bearer")
 
 @router.post("/refresh", response_model=Token)
@@ -46,7 +46,7 @@ async def refresh_token(request: Request, response: Response, session: AsyncSess
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
     
-    session_query = await session.execute(select(Session).where(Session.token == refresh_token))
+    session_query = await session.execute(select(Session).where(Session.token == get_token_hash(refresh_token)))
     session_data = session_query.scalar_one_or_none()
 
     if not session_data or session_data.expires_in < datetime.now(timezone.utc).timestamp():

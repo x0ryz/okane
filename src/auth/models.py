@@ -43,7 +43,7 @@ class Session(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     
-    token: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    token: Mapped[str] = mapped_column(String, nullable=False)
     expires_in: Mapped[int] = mapped_column(nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
