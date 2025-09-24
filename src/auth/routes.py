@@ -34,7 +34,7 @@ async def auth_user(payload: UserLogin, response: Response, session: AsyncSessio
     if not user or not verify_password(payload.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    access_token = create_access_token({"sub": user.username})
+    access_token = create_access_token({"sub": str(user.id)})
     refresh_token = await create_refresh_token(user_id=user.id, session=session)
     response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="strict")
     return Token(access_token=access_token, token_type="bearer")
@@ -60,7 +60,7 @@ async def refresh_token(request: Request, response: Response, session: AsyncSess
     
     await session.delete(session_data)
     
-    access_token = create_access_token({"sub": user_data.id})
+    access_token = create_access_token({"sub": str(user_data.id)})
     refresh_token = await create_refresh_token(user_id=user_data.id, session=session)
     response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="strict")
 
