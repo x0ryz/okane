@@ -20,7 +20,7 @@ async def setup_redis_client():
 
     try:
         await redis_client.ping()
-        logger.info("Redis is connected succesfully.")
+        logger.info("Redis is connected successfully.")
     except Exception as e:
         logger.error(f"Redis is not connected {e}.")
 

@@ -48,14 +48,5 @@ async def read_user(token: str = Depends(get_token), session: AsyncSession = Dep
 
     return user
 
-
-async def get_admin_user(user: User = Depends(read_user)) -> User:
-    if user.role == "admin":
-        return user
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="You are not admin",
-    )
-
 async def get_redis_client(request: Request) -> Redis:
     return request.app.state.redis_client

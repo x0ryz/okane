@@ -22,7 +22,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from src.auth.models import User, Session
+from src.auth.models import User
 from src.transactions.models import Transaction
 from src.categories.models import Category
 from src.database import Base

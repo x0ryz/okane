@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 
-from src.auth.models import User, Session
+from src.auth.models import User
 from src.auth.schemas import UserRegister, UserLogin, Token
 from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token, get_token_hash
 from src.auth.depends import get_redis_client
@@ -13,11 +13,11 @@ router = APIRouter(prefix="/auth", tags=["Authorization"])
 
 @router.post("/register")
 async def register_user(payload: UserRegister, session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(User).where(User.username == payload.username))
+    result = await session.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
     if user:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is alredy exist")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is already exist")
     
     payload_dict = payload.model_dump()
     payload_dict["password"] = get_password_hash(payload.password)
@@ -28,8 +28,8 @@ async def register_user(payload: UserRegister, session: AsyncSession = Depends(g
     return {"message": "User successfully registered"}
 
 @router.post("/login", response_model=Token)
-async def auth_user(payload: UserLogin, request: Request, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
-    result = await session.execute(select(User).where(User.username == payload.username))
+async def auth_user(payload: UserLogin, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
+    result = await session.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.password):
@@ -41,7 +41,7 @@ async def auth_user(payload: UserLogin, request: Request, response: Response, se
     return Token(access_token=access_token, token_type="bearer")
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(request: Request, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
+async def update_refresh_token(request: Request, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
     refresh_token = request.cookies.get("user_refresh_token")
 
     if not refresh_token:
@@ -69,18 +69,16 @@ async def refresh_token(request: Request, response: Response, session: AsyncSess
     return Token(access_token=access_token, token_type="bearer")
 
 @router.get("/logout")
-async def logout_user(request: Request, response: Response, session: AsyncSession = Depends(get_session)):
+async def logout_user(request: Request, response: Response, redis_client = Depends(get_redis_client)):
     refresh_token = request.cookies.get("user_refresh_token")
     
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
 
-    session_query = await session.execute(select(Session).where(Session.token == get_token_hash(refresh_token)))
-    session_data = session_query.scalar_one_or_none()
+    hash_token = get_token_hash(refresh_token)
+    redis_key = f"refresh_token:{hash_token}"
 
-    if session_data:
-        await session.delete(session_data)
-        await session.commit()
+    await redis_client.delete(redis_key)
 
     response.delete_cookie("user_refresh_token")
     return {"message": "Logged out successfully"}
