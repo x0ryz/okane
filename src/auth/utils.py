@@ -27,14 +27,20 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 def get_token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
-async def create_refresh_token(user_id: int, session) -> uuid.uuid4:
+async def create_refresh_token(user_id: int, redis_client) -> str:
     refresh_token = str(uuid.uuid4())
     hash_token = get_token_hash(refresh_token)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    session.add(Session(user_id=user_id, token=hash_token, expires_in=int(expires_at.timestamp())))
+    expires_in_seconds = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
 
-    await session.commit()
+    redis_key = f"refresh_token:{hash_token}"
+
+    await redis_client.setex(
+        redis_key,
+        expires_in_seconds,
+        str(user_id)
+    )
+
     return refresh_token
 
 def verify_refresh_token(raw_token: str, stored_hash: str) -> bool:

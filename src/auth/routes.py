@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from src.auth.models import User, Session
 from src.auth.schemas import UserRegister, UserLogin, Token
 from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token, get_token_hash
+from src.auth.depends import get_redis_client
 from src.database import get_session
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
@@ -27,7 +28,7 @@ async def register_user(payload: UserRegister, session: AsyncSession = Depends(g
     return {"message": "User successfully registered"}
 
 @router.post("/login", response_model=Token)
-async def auth_user(payload: UserLogin, response: Response, session: AsyncSession = Depends(get_session)) -> Token:
+async def auth_user(payload: UserLogin, request: Request, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
     result = await session.execute(select(User).where(User.username == payload.username))
     user = result.scalar_one_or_none()
 
@@ -35,34 +36,35 @@ async def auth_user(payload: UserLogin, response: Response, session: AsyncSessio
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     access_token = create_access_token({"sub": str(user.id)})
-    refresh_token = await create_refresh_token(user_id=user.id, session=session)
+    refresh_token = await create_refresh_token(user_id=user.id, redis_client=redis_client)
     response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="strict")
     return Token(access_token=access_token, token_type="bearer")
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(request: Request, response: Response, session: AsyncSession = Depends(get_session)) -> Token:
+async def refresh_token(request: Request, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
     refresh_token = request.cookies.get("user_refresh_token")
 
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing")
     
-    session_query = await session.execute(select(Session).where(Session.token == get_token_hash(refresh_token)))
-    session_data = session_query.scalar_one_or_none()
+    hash_token = get_token_hash(refresh_token)  
+    redis_key = f"refresh_token:{hash_token}"
 
-    if not session_data or session_data.expires_in < datetime.now(timezone.utc).timestamp():
+    user_id = await redis_client.get(redis_key)
+    
+    if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
     
-    user_query = await session.execute(select(User).where(User.id == session_data.user_id))
+    user_query = await session.execute(select(User).where(User.id == int(user_id)))
     user_data = user_query.scalar_one_or_none()
-
+    
     if not user_data:
+        await redis_client.delete(redis_key)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    await session.delete(session_data)
+    # logger.info(f"Refresh token used and deleted for user {user_id}")
     
     access_token = create_access_token({"sub": str(user_data.id)})
-    refresh_token = await create_refresh_token(user_id=user_data.id, session=session)
-    response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="strict")
 
     return Token(access_token=access_token, token_type="bearer")
 

@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from redis.asyncio import Redis
 
 from src.auth.routes import router as auth_router

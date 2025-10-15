@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from redis.asyncio import Redis
 
 from src.auth.models import User
 from src.auth.utils import decode_token
@@ -55,3 +56,6 @@ async def get_admin_user(user: User = Depends(read_user)) -> User:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="You are not admin",
     )
+
+async def get_redis_client(request: Request) -> Redis:
+    return request.app.state.redis_client
