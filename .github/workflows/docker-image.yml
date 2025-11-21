@@ -1,37 +1,27 @@
-name: Docker Image CI
+name: Deploy to VPS
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-
-  build:
-
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Copy files to server (optional)
-        uses: appleboy/scp-action@v0.1.7
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
           key: ${{ secrets.KEY }}
-          source: "."
-          target: "~/project"
-
-      - name: Run deploy script
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
           script: |
-            cd ~/project
-            git pull
-            docker compose down
+            cd ~/okane
+            
+            git pull origin main
+
             docker compose up -d --build
+
+            docker compose exec -T app alembic upgrade head
+
+            docker image prune -f
