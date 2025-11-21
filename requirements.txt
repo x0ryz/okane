@@ -9,3 +9,4 @@ passlib[bcrypt]
 pyjwt
 redis
 argon2_cffi
+gunicorn

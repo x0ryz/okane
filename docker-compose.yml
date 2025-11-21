@@ -3,8 +3,15 @@ services:
     build: .
     container_name: okane_app
     restart: always
-    ports:
-      - "8000:8000"
+    networks:
+      - default
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.okane.rule=Host(`okane.x0ryz.cc`)"
+      - "traefik.http.routers.okane.entrypoints=websecure"
+      - "traefik.http.routers.okane.tls.certresolver=myresolver"
+      - "traefik.http.services.okane.loadbalancer.server.port=8000"
     depends_on:
       - db
       - redis
@@ -30,3 +37,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  traefik_public:
+    external: true
