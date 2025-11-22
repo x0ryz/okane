@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class RedisConfig(BaseModel):
     host: str
@@ -19,8 +19,6 @@ class Settings(BaseSettings):
     def redis(self) -> RedisConfig:
         return RedisConfig(host=self.REDIS_HOST, port=self.REDIS_PORT)
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = ConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

@@ -1,10 +1,9 @@
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from redis.asyncio import Redis
 
 from src.auth.models import User
 from src.auth.utils import decode_token
@@ -47,6 +46,3 @@ async def read_user(token: str = Depends(get_token), session: AsyncSession = Dep
         )
 
     return user
-
-async def get_redis_client(request: Request) -> Redis:
-    return request.app.state.redis_client

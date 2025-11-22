@@ -12,6 +12,7 @@ services:
       - "traefik.http.routers.okane.entrypoints=websecure"
       - "traefik.http.routers.okane.tls.certresolver=myresolver"
       - "traefik.http.services.okane.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik_public"
     depends_on:
       - db
       - redis

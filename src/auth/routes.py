@@ -1,18 +1,18 @@
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Header
 
 from src.auth.models import User
-from src.auth.schemas import UserRegister, UserLogin, Token
+from src.auth.schemas import UserRegister, UserLogin, AuthResponse, Token
 from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token, get_token_hash
-from src.auth.depends import get_redis_client
+from src.database import get_redis_client
 from src.database import get_session
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
 
-@router.post("/register")
-async def register_user(payload: UserRegister, session: AsyncSession = Depends(get_session)):
+@router.post("/register", response_model=AuthResponse)
+async def register_user(payload: UserRegister, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client), x_client_type: str | None = Header(default=None)) -> Token:
     result = await session.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
@@ -22,23 +22,33 @@ async def register_user(payload: UserRegister, session: AsyncSession = Depends(g
     payload_dict = payload.model_dump()
     payload_dict["password"] = get_password_hash(payload.password)
 
-    session.add(User(**payload_dict))
+    new_user = User(**payload_dict)
+    session.add(new_user)
     await session.commit()
-    
-    return {"message": "User successfully registered"}
+    await session.refresh(new_user)
 
-@router.post("/login", response_model=Token)
-async def auth_user(payload: UserLogin, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
+    return await _generate_auth_response(new_user, response, redis_client, x_client_type)
+
+@router.post("/login", response_model=AuthResponse)
+async def auth_user(payload: UserLogin, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client), x_client_type: str | None = Header(default=None)) -> Token:
     result = await session.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    return await _generate_auth_response(user, response, redis_client, x_client_type)
+
+
+async def _generate_auth_response(user, response: Response, redis_client, x_client_type):
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = await create_refresh_token(user_id=user.id, redis_client=redis_client)
-    response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="strict")
-    return Token(access_token=access_token, token_type="bearer")
+
+    if x_client_type == "mobile":
+        return AuthResponse(access_token=access_token, refresh_token=refresh_token, token_type="bearer", user=user)
+    else:
+        response.set_cookie(key="user_refresh_token", value=str(refresh_token), httponly=True, samesite="lax", secure=True)
+        return AuthResponse(access_token=access_token, token_type="bearer", user=user)
 
 @router.post("/refresh", response_model=Token)
 async def update_refresh_token(request: Request, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)) -> Token:
