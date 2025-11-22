@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy import or_
 
 from src.categories.models import Category
-from src.categories.schemas import CreateCategory
+from src.categories.schemas import CategoryCreate
 from src.database import get_session
 from src.auth.depends import read_user
 
@@ -21,7 +21,7 @@ async def get_categories(session: AsyncSession = Depends(get_session), user = De
     return result
 
 @router.post("/")
-async def create_user_category(payload: CreateCategory, session: AsyncSession = Depends(get_session), user = Depends(read_user)):
+async def create_user_category(payload: CategoryCreate, session: AsyncSession = Depends(get_session), user = Depends(read_user)):
     session.add(Category(user_id=user.id, name=payload.name))
     await session.commit()
     return {"message": "Category successfully created"}

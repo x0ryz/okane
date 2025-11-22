@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Header
