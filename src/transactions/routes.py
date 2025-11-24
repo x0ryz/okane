@@ -132,3 +132,18 @@ async def update_transaction(transaction_id: int, payload: TransactionUpdate, se
     updated_transaction = result.scalar_one()
 
     return updated_transaction
+
+@router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_transaction(transaction_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(read_user)):
+    transaction = await session.get(Transaction, transaction_id)
+
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if not transaction.user_id == user.id:
+        raise HTTPException(status_code=403, detail="You cannot delete other users' transactions")
+
+    await session.delete(transaction)
+    await session.commit()
+
+    return
