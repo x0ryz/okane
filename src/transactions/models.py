@@ -14,7 +14,7 @@ class Transaction(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    category_id = mapped_column(Integer, ForeignKey("categories.id"))
+    category_id = mapped_column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
 
     type: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
