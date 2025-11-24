@@ -1,6 +1,6 @@
 services:
   app:
-    image: python:3.11-slim
+    image: mcr.microsoft.com/devcontainers/python:3.11
     volumes:
       - ../:/workspaces:cached
     command: sleep infinity
