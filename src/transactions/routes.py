@@ -72,6 +72,23 @@ async def create_transaction(
 
     return new_transaction
 
+@router.get("/{transaction_id}", response_model=TransactionOut)
+async def get_transaction(transaction_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(read_user)):
+    query = (
+        select(Transaction).where(Transaction.id == transaction_id)
+        .options(joinedload(Transaction.category))
+    )
+    result = await session.execute(query)
+    transaction = result.scalar_one_or_none()
+
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if not transaction.user_id == user.id:
+        raise HTTPException(status_code=403, detail="You cannot access to other users' transactions")
+
+    return transaction
+
 @router.patch("/{transaction_id}", response_model=TransactionOut, responses={
     status.HTTP_403_FORBIDDEN: {"description": "You cannot edit other users' transactions"},
     status.HTTP_404_NOT_FOUND: {"description": "Transaction does not exist"},
