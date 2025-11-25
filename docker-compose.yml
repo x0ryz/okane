@@ -16,6 +16,17 @@ services:
     depends_on:
       - db
       - redis
+      - rabbitmq
+    env_file:
+      - .env
+
+  worker:
+    build: .
+    container_name: okane_worker
+    restart: always
+    command: faststream run src.worker:app --workers 1
+    depends_on:
+      - rabbitmq
     env_file:
       - .env
 
@@ -35,9 +46,20 @@ services:
     volumes:
       - redis_data:/data
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: okane_rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
 volumes:
   postgres_data:
   redis_data:
+  rabbitmq_data:
 
 networks:
   traefik_public:
