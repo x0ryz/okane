@@ -2,9 +2,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from random import randint
+import secrets
 
 from src.auth.models import User
-from src.auth.schemas import UserRegister, UserLogin, AuthResponse, Token, VerifyEmail, UserEmail
+from src.auth.schemas import UserRegister, UserLogin, AuthResponse, Token, VerifyEmail, UserEmail, ForgotPasswordRequest, ResetPasswordRequest
 from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token, get_token_hash
 from src.database import get_session
 from src.redis_utils import get_redis_client
@@ -181,6 +182,55 @@ async def update_refresh_token(request: Request, session: AsyncSession = Depends
     access_token = create_access_token({"sub": str(user_data.id)})
 
     return Token(access_token=access_token, token_type="bearer")
+
+
+@router.post("/forgot", status_code=status.HTTP_202_ACCEPTED)
+async def forgot_password(
+        payload: ForgotPasswordRequest,
+        session: AsyncSession = Depends(get_session),
+        redis=Depends(get_redis_client)
+):
+    result = await session.execute(select(User).where(User.email == payload.email))
+    user = result.scalar_one_or_none()
+
+    if user:
+        token = secrets.token_urlsafe(32)
+
+        redis_key = f"pwd_reset:{token}"
+        await redis.set(redis_key, user.email, ex=900)
+
+        await broker.publish(
+            {
+                "email": user.email,
+                "token": token
+            },
+            queue="verification"
+        )
+
+    return {"message": "If this email exists, verification link has been sent."}
+
+@router.post("/reset", status_code=status.HTTP_200_OK)
+async def reset_password(payload: ResetPasswordRequest, session: AsyncSession = Depends(get_session), redis = Depends(get_redis_client)):
+    redis_key = f"pwd_reset:{payload.token}"
+
+    email = await redis.get(redis_key)
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password = get_password_hash(payload.new_password)
+    session.add(user)
+    await session.commit()
+
+    await redis.delete(redis_key)
+
+    return {"message": "Password updated successfully"}
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def logout_user(request: Request, response: Response, redis_client = Depends(get_redis_client)):
