@@ -20,6 +20,13 @@ class UserLogin(BaseModel):
     email: EmailStr = Field(..., examples=["user@example.com"])
     password: str = Field(..., examples=["password"])
 
+class UserEmail(BaseModel):
+    email: EmailStr
+
+class VerifyEmail(BaseModel):
+    email: EmailStr
+    code: str
+
 class Token(BaseModel):
     access_token: str = Field(..., examples=['eyJhbGciOiJIUzI1NiIsInR5cC...'])
     token_type: str = Field(..., examples=['bearer'])

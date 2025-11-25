@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     REDIS_HOST: str
     REDIS_PORT: int
 
+    RABBITMQ_URL: str
+
     @property
     def redis(self) -> RedisConfig:
         return RedisConfig(host=self.REDIS_HOST, port=self.REDIS_PORT)

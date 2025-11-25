@@ -4,10 +4,11 @@ services:
     volumes:
       - ../:/workspaces:cached
     command: sleep infinity
-    network_mode: service:db
+#    network_mode: service:db
     depends_on:
       - db
       - redis
+      - rabbitmq
     environment:
       - DATABASE_URL=postgresql+asyncpg://okane_user:okane_pass@db:5432/okane_db
       - REDIS_HOST=redis
@@ -16,6 +17,7 @@ services:
       - ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
       - REFRESH_TOKEN_EXPIRE_DAYS=30
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
 
   db:
     image: postgres:17
@@ -32,6 +34,20 @@ services:
     restart: unless-stopped
     volumes:
       - redis-data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 5s
+      timeout: 15s
+      retries: 5
 
 volumes:
   postgres-data:

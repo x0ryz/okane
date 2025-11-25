@@ -1,10 +1,9 @@
 from faststream import FastStream
-from faststream.rabbit import RabbitBroker
 import resend
 
 from src.config import settings
+from src.mq import broker
 
-broker = RabbitBroker(settings.RABBITMQ_URL)
 app = FastStream(broker)
 
 resend.api_key = settings.RESEND_API

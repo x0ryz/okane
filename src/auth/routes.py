@@ -4,19 +4,20 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from random import randint
 
 from src.auth.models import User
-from src.auth.schemas import UserRegister, UserLogin, AuthResponse, Token
+from src.auth.schemas import UserRegister, UserLogin, AuthResponse, Token, VerifyEmail, UserEmail
 from src.auth.utils import get_password_hash, verify_password, create_access_token, create_refresh_token, get_token_hash
-from src.database import get_redis_client
 from src.database import get_session
+from src.redis_utils import get_redis_client
+from src.worker import broker
 
 router = APIRouter(prefix="/auth", tags=["Authorization"])
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED,
+@router.post("/register", status_code=status.HTTP_201_CREATED,
     summary="Register new user",
     responses={
         status.HTTP_409_CONFLICT: {"description": "User is already exist"}
 })
-async def register_user(payload: UserRegister, response: Response, session: AsyncSession = Depends(get_session),redis_client = Depends(get_redis_client)) -> Token:
+async def register_user(payload: UserRegister, session: AsyncSession = Depends(get_session),redis_client = Depends(get_redis_client)):
     """
     Registers a new user in the system.
 
@@ -41,8 +42,13 @@ async def register_user(payload: UserRegister, response: Response, session: Asyn
     redis_key = f"verification:{new_user.email}"
 
     await redis_client.set(redis_key, verification_code, ex=300)
+    message_body = {
+        "email": new_user.email,
+        "code": verification_code
+    }
 
-    return await _generate_auth_response(new_user, response, redis_client)
+    await broker.publish(message_body, queue="verification")
+    return {"message": "User created successfully"}
 
 @router.post("/login", response_model=AuthResponse, summary="", responses={
     status.HTTP_401_UNAUTHORIZED: {"description": "Invalid credentials"}
@@ -61,8 +67,76 @@ async def auth_user(payload: UserLogin, response: Response, session: AsyncSessio
     if not user or not verify_password(payload.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email is not verified. Please verify your account."
+        )
+
     return await _generate_auth_response(user, response, redis_client)
 
+@router.post("/resend")
+async def resend_verification_code(payload: UserEmail, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)):
+    result = await session.execute(select(User).where(User.email == payload.email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.is_verified:
+        raise HTTPException(status_code=400, detail="Email is already verified")
+
+    spam_key = f"spam_block:{user.email}"
+    if await redis_client.exists(spam_key):
+        ttl = await redis_client.ttl(spam_key)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Please wait {ttl} seconds before requesting a new code"
+        )
+
+    new_code = str(randint(100000, 999999))
+    verification_key = f"verification:{user.email}"
+
+    await redis_client.set(verification_key, new_code, ex=300)
+
+    await redis_client.set(spam_key, "1", ex=60)
+
+    message = {
+        "email": user.email,
+        "code": new_code
+    }
+
+    await broker.publish(message, queue="verification")
+
+    return {"message": "Verification code sent"}
+
+@router.post("/verify")
+async def verify_email(payload: VerifyEmail, response: Response, session: AsyncSession = Depends(get_session), redis_client = Depends(get_redis_client)):
+    redis_key = f"verification:{payload.email}"
+    stored_code = await redis_client.get(redis_key)
+    print(stored_code, payload.code)
+
+    if not stored_code or stored_code != payload.code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired code")
+
+    # 2. Отримання користувача
+    result = await session.execute(select(User).where(User.email == payload.email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.is_verified:
+        return await _generate_auth_response(user, response, redis_client)
+
+    user.is_verified = True
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    await redis_client.delete(redis_key)
+
+    return await _generate_auth_response(user, response, redis_client)
 
 async def _generate_auth_response(user, response: Response, redis_client):
     access_token = create_access_token({"sub": str(user.id)})

@@ -1,4 +1,4 @@
-from redis_utils import asyncio as aioredis
+from redis import asyncio as aioredis
 from src.config import settings
 
 redis_client: aioredis.Redis | None = None
