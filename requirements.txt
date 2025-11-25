@@ -10,3 +10,5 @@ pyjwt
 redis
 argon2_cffi
 gunicorn
+faststream[rabbit]
+resend

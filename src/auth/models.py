@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import ForeignKey, String, DateTime
+from sqlalchemy import ForeignKey, String, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database import Base
 
@@ -16,6 +16,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(50), unique=True)
     password: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
 
     transactions: Mapped[list[Transaction]] = relationship(
         back_populates="user",

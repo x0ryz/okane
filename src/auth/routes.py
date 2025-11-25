@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from random import randint
 
 from src.auth.models import User
 from src.auth.schemas import UserRegister, UserLogin, AuthResponse, Token
@@ -35,6 +36,11 @@ async def register_user(payload: UserRegister, response: Response, session: Asyn
     session.add(new_user)
     await session.commit()
     await session.refresh(new_user)
+
+    verification_code = str(randint(100000, 999999))
+    redis_key = f"verification:{new_user.email}"
+
+    await redis_client.set(redis_key, verification_code, ex=300)
 
     return await _generate_auth_response(new_user, response, redis_client)
 
