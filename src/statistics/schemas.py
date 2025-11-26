@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import date
 
-from src.categories.schemas import CategoryOut
+from src.categories.schemas import CategoryRead
 
 
 class DashboardStats(BaseModel):
@@ -10,7 +10,7 @@ class DashboardStats(BaseModel):
     last_month_expenses: float
 
 class CategoryStat(BaseModel):
-    category: CategoryOut
+    category: CategoryRead
     total_amount: float
     percentage: float
 

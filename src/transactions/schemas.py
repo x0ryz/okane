@@ -3,7 +3,7 @@ from typing import Literal
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, model_validator, Field
 
-from src.categories.schemas import CategoryOut
+from src.categories.schemas import CategoryRead
 
 
 class TransactionCreate(BaseModel):
@@ -20,7 +20,7 @@ class TransactionOut(BaseModel):
     name: str
     amount: Decimal
     date: datetime
-    category: CategoryOut | None = None
+    category: CategoryRead | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
