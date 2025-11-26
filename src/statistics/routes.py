@@ -3,17 +3,51 @@ from datetime import date, timedelta, datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, case
 from sqlalchemy.orm import joinedload
 
 from src.database import get_session
-from src.statistics.schemas import CategoryStat,DailyStat
+from src.statistics.schemas import CategoryStat, DailyStat, DashboardStats
 from src.auth.models import User
 from src.transactions.models import Transaction
 from src.categories.models import Category
 from src.auth.depends import read_user
 
 router = APIRouter(prefix="/statistics", tags=["Statistics"])
+
+@router.get("/dashboard", response_model=DashboardStats)
+async def get_dashboard_stats(user: User = Depends(read_user), session: AsyncSession = Depends(get_session)):
+    today = date.today()
+    start_date = date(today.year, today.month, 1)
+
+    query = select(
+        func.sum(case((Transaction.type == "income", Transaction.amount), else_=0)),
+        func.sum(case((Transaction.type == "expense", Transaction.amount), else_=0)),
+        func.sum(case(
+            (and_(Transaction.type == 'income', Transaction.date >= start_date), Transaction.amount),
+            else_=0
+        )),
+        func.sum(case(
+            (and_(Transaction.type == 'expense', Transaction.date >= start_date), Transaction.amount),
+            else_=0
+        )),
+    ).where(Transaction.user_id == user.id)
+
+    result = await session.execute(query)
+    total_income, total_expense, month_income, month_expense = result.one()
+
+    total_income = float(total_income or 0)
+    total_expense = float(total_expense or 0)
+    month_income = float(month_income or 0)
+    month_expense = float(month_expense or 0)
+
+    current_balance = total_income - total_expense
+
+    return DashboardStats(
+        current_balance=current_balance,
+        last_month_income=month_income,
+        last_month_expenses=month_expense
+    )
 
 @router.get("/categories", response_model=list[CategoryStat])
 async def get_stats_by_categories(
