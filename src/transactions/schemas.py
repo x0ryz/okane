@@ -24,11 +24,11 @@ class TransactionOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @model_validator(mode='after')
-    def adjust_sign_for_expense(self):
-        if self.type == "expense" and self.amount > 0:
-            self.amount = -self.amount
-        return self
+    # @model_validator(mode='after')
+    # def adjust_sign_for_expense(self):
+    #     if self.type == "expense" and self.amount > 0:
+    #         self.amount = -self.amount
+    #     return self
 
 class TransactionUpdate(BaseModel):
     type: Literal["income", "expense"]

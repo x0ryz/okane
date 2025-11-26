@@ -3,7 +3,7 @@ from datetime import date, timedelta, datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from sqlalchemy.orm import joinedload
 
 from src.database import get_session
@@ -30,7 +30,12 @@ async def get_stats_by_categories(
                 Transaction.user_id == user.id,
                 func.date(Transaction.date) >= start_date,
                 func.date(Transaction.date) <= end_date,
-                Transaction.type == "expense"
+                Transaction.type == "expense",
+
+                or_(
+                    Category.user_id == None,
+                    Category.user_id == user.id
+                )
             )
         )
         .group_by(Category.id)
