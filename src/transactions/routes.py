@@ -6,6 +6,9 @@ from sqlalchemy.future import select
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
+
 from src.transactions.models import Transaction
 from src.categories.models import Category
 from src.auth.models import User
@@ -16,7 +19,7 @@ from src.auth.depends import read_user
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 
-@router.get('/', response_model=list[TransactionOut])
+@router.get('/', response_model=Page[TransactionOut])
 async def get_transactions(
         transaction_type: Optional[Literal["expense", "income"]] = Query(None),
         session: AsyncSession = Depends(get_session),
@@ -25,18 +28,13 @@ async def get_transactions(
     stmt = (select(Transaction)
             .options(joinedload(Transaction.category))
             .where(Transaction.user_id == user.id)
+            .order_by(Transaction.date.desc())
             )
 
     if transaction_type:
         stmt = stmt.where(Transaction.type == transaction_type)
 
-    result = await session.execute(stmt)
-    transactions = result.scalars().all()
-
-    if not transactions:
-        return []
-
-    return transactions
+    return await paginate(session, stmt)
 
 @router.post("/", response_model=TransactionOut)
 async def create_transaction(

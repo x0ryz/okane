@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi_pagination import add_pagination
 
 from src.auth.routes import router as auth_router
 from src.transactions.routes import router as transactions_router
@@ -32,3 +33,5 @@ app.include_router(auth_router)
 app.include_router(transactions_router)
 app.include_router(categories_router)
 app.include_router(statistics_router)
+
+add_pagination(app)

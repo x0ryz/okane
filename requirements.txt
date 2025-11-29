@@ -12,3 +12,4 @@ argon2_cffi
 gunicorn
 faststream[rabbit]
 resend
+fastapi-pagination
