@@ -1,5 +1,6 @@
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
+from fastapi import HTTPException, status
 from src.config import settings
 import uuid, jwt, hashlib
 
@@ -47,5 +48,20 @@ def verify_refresh_token(raw_token: str, stored_hash: str) -> bool:
     return get_token_hash(raw_token) == stored_hash
 
 def decode_token(token: str):
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.ALGORITHM)
-    return payload
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.ALGORITHM)
+        return payload
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

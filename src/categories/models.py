@@ -13,6 +13,8 @@ class Category(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     name: Mapped[str] = mapped_column(String, nullable=False)
+    color: Mapped[str] = mapped_column(String, default="#CCCCCC", nullable=False)
+    icon: Mapped[str] = mapped_column(String, default="📦", nullable=True)
 
     user: Mapped[User] = relationship(back_populates="categories")
     transactions: Mapped[Transaction] = relationship("Transaction", back_populates="category")

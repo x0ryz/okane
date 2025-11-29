@@ -1,11 +1,18 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class CategoryCreate(BaseModel):
-    name: str = Field(..., min_length=2, max_length=50, examples=["Робота", "Розваги"])
-
-class CategoryOut(BaseModel):
-    id: int
+class CategoryBase(BaseModel):
     name: str
+    color: str = "#CCCCCC"
+    icon: str = "📦"
+
+
+class CategoryCreate(CategoryBase):
+    pass
+
+
+class CategoryRead(CategoryBase):
+    id: int
+    user_id: int | None
 
     model_config = ConfigDict(from_attributes=True)
