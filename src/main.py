@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi_pagination import add_pagination
 
 from src.auth.routes import router as auth_router
@@ -35,3 +36,10 @@ app.include_router(categories_router)
 app.include_router(statistics_router)
 
 add_pagination(app)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "https://okane.x0ryz.cc"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
